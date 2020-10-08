@@ -152,7 +152,7 @@ static void cliRefreshPrompt(void) {
     if (config.dbnum != 0 && config.last_cmd_type != REDIS_REPLY_ERROR)
         len += snprintf(config.prompt+len,sizeof(config.prompt)-len,"[%d]",
             config.dbnum);
-    snprintf(config.prompt+len,sizeof(config.prompt)-len,"> ");
+    snprintf(config.prompt+len,sizeof(config.prompt)-len,">>>> ");
 }
 
 static sds getHistoryPath() {
@@ -556,7 +556,7 @@ static int cliReadReply(int output_raw_strings) {
     redisReply *reply;
     sds out = NULL;
     int output = 1;
-
+    printf("cliReadReply 接下去调用hiredis  redisGetReply 111 \n");
     if (redisGetReply(context,&_reply) != REDIS_OK) {
         if (config.shutdown) {
             redisFree(context);
@@ -577,7 +577,7 @@ static int cliReadReply(int output_raw_strings) {
     }
 
     reply = (redisReply*)_reply;
-
+    printf("cliReadReply  reply->str %s  \n", reply->str);
     config.last_cmd_type = reply->type;
 
     /* Check if we need to connect to a different node and reissue the
@@ -625,6 +625,7 @@ static int cliReadReply(int output_raw_strings) {
             }
         }
         fwrite(out,sdslen(out),1,stdout);
+        printf("cliReadReply %s  \n", out);
         sdsfree(out);
     }
     freeReplyObject(reply);
@@ -635,7 +636,7 @@ static int cliSendCommand(int argc, char **argv, int repeat) {
     char *command = argv[0];
     size_t *argvlen;
     int j, output_raw;
-
+    printf("cliSendCommand  111\n");
     if (!strcasecmp(command,"help") || !strcasecmp(command,"?")) {
         cliOutputHelp(--argc, ++argv);
         return REDIS_OK;
@@ -671,12 +672,14 @@ static int cliSendCommand(int argc, char **argv, int repeat) {
         argvlen[j] = sdslen(argv[j]);
 
     while(repeat--) {
+        printf("cliSendCommand  222111\n");
         redisAppendCommandArgv(context,argc,(const char**)argv,argvlen);
+        printf("cliSendCommand  222222\n");
         while (config.monitor_mode) {
             if (cliReadReply(output_raw) != REDIS_OK) exit(1);
             fflush(stdout);
         }
-
+        printf("cliSendCommand  333\n");
         if (config.pubsub_mode) {
             if (config.output != OUTPUT_RAW)
                 printf("Reading messages... (press Ctrl-C to quit)\n");
@@ -684,7 +687,7 @@ static int cliSendCommand(int argc, char **argv, int repeat) {
                 if (cliReadReply(output_raw) != REDIS_OK) exit(1);
             }
         }
-
+        printf("cliSendCommand  444\n");
         if (config.slave_mode) {
             printf("Entering slave output mode...  (press Ctrl-C to quit)\n");
             slaveMode();
@@ -692,7 +695,7 @@ static int cliSendCommand(int argc, char **argv, int repeat) {
             free(argvlen);
             return REDIS_ERR;  /* Error = slaveMode lost connection to master */
         }
-
+printf("cliSendCommand  555\n");
         if (cliReadReply(output_raw) != REDIS_OK) {
             free(argvlen);
             return REDIS_ERR;
@@ -705,8 +708,11 @@ static int cliSendCommand(int argc, char **argv, int repeat) {
                 cliSelect();
             }
         }
+        printf("cliSendCommand  6666\n");
         if (config.interval) usleep(config.interval);
+        printf("cliSendCommand  7777\n");
         fflush(stdout); /* Make it grep friendly */
+        printf("cliSendCommand  8888\n");
     }
 
     free(argvlen);
@@ -986,6 +992,7 @@ static void repl(void) {
     while((line = linenoise(context ? config.prompt : "not connected> ")) != NULL) {
         if (line[0] != '\0') {
             argv = sdssplitargs(line,&argc);
+            printf("argv  = %s, line %s\n", argv, line);
             if (history) linenoiseHistoryAdd(line);
             printf("HISTORY: %s\n", historyfile);
             if (historyfile) linenoiseHistorySave(historyfile);
@@ -1000,12 +1007,14 @@ static void repl(void) {
                 {
                     exit(0);
                 } else if (argc == 3 && !strcasecmp(argv[0],"connect")) {
+                    printf("repl11111\n");
                     sdsfree(config.hostip);
                     config.hostip = sdsnew(argv[1]);
                     config.hostport = atoi(argv[2]);
                     cliRefreshPrompt();
                     cliConnect(1);
                 } else if (argc == 1 && !strcasecmp(argv[0],"clear")) {
+                    printf("repl  22222\n");
                     linenoiseClearScreen();
                 } else {
                     long long start_time = mstime(), elapsed;
@@ -1017,17 +1026,20 @@ static void repl(void) {
                     } else {
                         repeat = 1;
                     }
-
+                    printf("repl  3333\n");
                     issueCommandRepeat(argc-skipargs, argv+skipargs, repeat);
 
                     elapsed = mstime()-start_time;
                     if (elapsed >= 500) {
-                        printf("(%.2fs)\n",(double)elapsed/1000);
+                        printf("响应时间(%.2fs)\n",(double)elapsed/1000);
                     }
                 }
             }
+            printf("repl  44444\n");
             /* Free the argument vector */
             sdsfreesplitres(argv,argc);
+        }else{
+            printf("kong\n");
         }
         /* linenoise() returns malloc-ed lines like readline() */
         free(line);
@@ -2230,36 +2242,42 @@ int main(int argc, char **argv) {
     if (config.latency_mode) {
         if (cliConnect(0) == REDIS_ERR) exit(1);
         latencyMode();
+        fprintf(stderr,"latency_mode");
     }
 
     /* Latency distribution mode */
     if (config.latency_dist_mode) {
         if (cliConnect(0) == REDIS_ERR) exit(1);
         latencyDistMode();
+        fprintf(stderr,"latency_dist_mode");
     }
 
     /* Slave mode */
     if (config.slave_mode) {
         if (cliConnect(0) == REDIS_ERR) exit(1);
         slaveMode();
+        fprintf(stderr,"slave_mode");
     }
 
     /* Get RDB mode. */
     if (config.getrdb_mode) {
         if (cliConnect(0) == REDIS_ERR) exit(1);
         getRDB();
+        fprintf(stderr,"getrdb_mode");
     }
 
     /* Pipe mode */
     if (config.pipe_mode) {
         if (cliConnect(0) == REDIS_ERR) exit(1);
         pipeMode();
+        fprintf(stderr,"11111");
     }
 
     /* Find big keys */
     if (config.bigkeys) {
         if (cliConnect(0) == REDIS_ERR) exit(1);
         findBigKeys();
+        fprintf(stderr,"22222");
     }
 
     /* Stat mode */
@@ -2267,18 +2285,21 @@ int main(int argc, char **argv) {
         if (cliConnect(0) == REDIS_ERR) exit(1);
         if (config.interval == 0) config.interval = 1000000;
         statMode();
+        fprintf(stderr,"3333");
     }
 
     /* Scan mode */
     if (config.scan_mode) {
         if (cliConnect(0) == REDIS_ERR) exit(1);
         scanMode();
+        fprintf(stderr,"4444");
     }
 
     /* LRU test mode */
     if (config.lru_test_mode) {
         if (cliConnect(0) == REDIS_ERR) exit(1);
         LRUTestMode();
+        fprintf(stderr,"5555");
     }
 
     /* Intrinsic latency mode */
@@ -2292,14 +2313,17 @@ int main(int argc, char **argv) {
         /* Note that in repl mode we don't abort on connection error.
          * A new attempt will be performed for every command send. */
         cliConnect(0);
+        fprintf(stderr,"66666");
         repl();
     }
 
     /* Otherwise, we have some arguments to execute */
     if (cliConnect(0) != REDIS_OK) exit(1);
     if (config.eval) {
+        fprintf(stderr,"77777");
         return evalMode(argc,argv);
     } else {
+        fprintf(stderr,"]8888");
         return noninteractive(argc,convertToSds(argc,argv));
     }
 }

@@ -1684,6 +1684,7 @@ void checkTcpBacklogSettings(void) {
  * configuration but the function is not able to bind * for at least
  * one of the IPv4 or IPv6 protocols. */
 int listenToPort(int port, int *fds, int *count) {
+    printf("监听端口listenToPort");
     int j;
 
     /* Force binding of 0.0.0.0 if no bind address is specified, always
@@ -1764,6 +1765,7 @@ void resetServerStats(void) {
 }
 
 void initServer(void) {
+    printf("初始化服务器initServer");
     int j;
 
     signal(SIGHUP, SIG_IGN);
@@ -3607,6 +3609,7 @@ int main(int argc, char **argv) {
     gettimeofday(&tv,NULL);
     dictSetHashFunctionSeed(tv.tv_sec^tv.tv_usec^getpid());
     server.sentinel_mode = checkForSentinelMode(argc,argv);
+    printf("主函数启动，接下去初始化默认配置");
     initServerConfig();
 
     /* We need to init sentinel right now as parsing the configuration file
